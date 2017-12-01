@@ -1,0 +1,315 @@
+Tab Tab1 = instance.ActiveTab;
+var tblMultiakk = project.Tables["multiakk"];
+var tblResult = project.Tables["Result"];
+
+IZennoList lstDb = project.Lists["db"];
+IZennoList lstBad = project.Lists["bad"];
+int i=0;
+int time = Convert.ToInt32(project.Variables["time"].Value);
+int time1 = Convert.ToInt32(project.Variables["time1"].Value);
+Random rndGenerator = new Random();
+string strDate = DateTime.Now.ToString();
+SibboraHelper.WebHelper wHelper = new SibboraHelper.WebHelper(instance, project);
+wHelper.GlobalKMEmulate = true;
+//wHelper.AllStepsLog.Options.GetScreenshots = false;
+bool ProtectXPath = true;
+
+HtmlElement he = instance.ActiveTab.FindElementById("errorTryAgain");
+string stTabURL = string.Empty;
+
+int PauseBefore = rndGenerator.Next(0, 50);
+int PauseBetweenChecks = rndGenerator.Next(0, 50);
+int Timeout = rndGenerator.Next(15000, 30000);
+int FullEmulationDelayFrom = rndGenerator.Next(0, 50);
+int FullEmulationDelayTo = rndGenerator.Next(0, 50);
+int SendTextMinDelay = rndGenerator.Next(0, 50);
+int SendTextMaxDelay = rndGenerator.Next(0, 50);
+
+int intSpeedModeSend = rndGenerator.Next(0, 5000);
+wHelper.PauseBefore = rndGenerator.Next(0, 5000);
+
+instance.ClearCache(); //очищаю кэш
+instance.ClearCookie(); //очищаю куки
+
+instance.UseCSS = true;
+instance.UseMedia = true;
+
+instance.CanvasRenderMode = ZennoLab.InterfacesLibrary.Enums.Browser.CanvasMode.Emulate; //включаем эмуляцию канваса
+instance.CanvasRenderSeed = Guid.NewGuid().ToString(); //генерируем новый Canvas Seed
+
+string strLogin = string.Empty;
+string strPass = string.Empty;
+string strProxy = string.Empty;
+string strUserAgent = string.Empty;
+string strPhone = string.Empty;
+
+// Выбираем случайную версию Firefox
+string version = Macros.TextProcessing.Spintax("{38|39|40|41|42|43|44|45|46|47|48|49|50|51|52|53}");
+//if(((ZennoLab.InterfacesLibrary.ProjectModel.Collections.IContextExt)project.Context).IsInterrupted) return null;
+
+//Формируем набор buildID нашего Firefox (у каждой версии свой) [Идея хранения позаимствована у doc'a, за что ему большая благодарность!]
+Dictionary <string, string> buildIDSet = new Dictionary <string, string>();
+buildIDSet.Add("53", "20170413192749");
+buildIDSet.Add("52", "20170316213829");
+buildIDSet.Add("51", "20170125094131");
+buildIDSet.Add("50", "20161104212021");
+buildIDSet.Add("49", "20161019084923");
+buildIDSet.Add("48", "20160817112116");
+buildIDSet.Add("47", "20160623154057");
+buildIDSet.Add("46", "20160502172042");
+buildIDSet.Add("45", "20160905130425");
+buildIDSet.Add("44", "20160210153822");
+buildIDSet.Add("43", "20160105164030");
+buildIDSet.Add("42", "20151029151421");
+buildIDSet.Add("41", "20151014143721");
+buildIDSet.Add("40", "20150812163655");
+buildIDSet.Add("39", "20150618135210");
+buildIDSet.Add("38", "20150513174244");
+ 
+instance.ShowNavigatorField(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.BuildId);
+// Устанавливаем BuildID
+instance.SetHeader(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.BuildId, buildIDSet[version]);
+ 
+// Формируем набор версий операционной системы Windows
+// 6.0 Windows Vista
+// 6.1 Windows 7
+// 6.2 Windows 8
+// 6.3 Windows 8.1
+// 10.0 Windows 10
+string winOC = Macros.TextProcessing.Spintax("{6.0|6.1|6.2|6.3|10.0}");
+string platform = Macros.TextProcessing.Spintax("{Win32|Win64}");
+ 
+// Определяем "битность" самого приложения
+string platformApp = string.Empty;
+if(platform=="Win32"){
+    platformApp = Macros.TextProcessing.Spintax("{; WOW64|}");
+} else {
+    platformApp = "; Win64; x64";
+}
+// Устанавливаем Useragent
+project.Profile.UserAgent = string.Format("Mozilla/5.0 (Windows NT {0}{1}; rv:{2}.0) Gecko/20100101 Firefox/{2}.0", winOC, platformApp, version);
+project.Profile.UserAgentAppVersion = "5.0 (Windows)";
+project.Profile.UserAgentAppName = "Netscape";
+project.Profile.UserAgentAppCodeName = "Mozilla";
+project.Profile.UserAgentProduct = "Gecko";
+project.Profile.UserAgentProductSub = "20100101";
+ 
+// OC
+project.Profile.UserAgentOsCpu = string.Format("Windows NT {0}{1}", winOC, platformApp);
+project.Profile.UserAgentPlatform = platform;
+
+// Формируем набор популярных десктопных разрешений [Идея хранения позаимствована у doc'a, за что ему большая благодарность!]
+int [,] resolutionSet = {
+    {2880, 1800},
+    {2560, 1600},
+    {2560, 1440},
+    {1920, 1200},
+    {1920, 1080},
+    {1680, 1050},
+    {1600, 1200},
+    {1600, 900},
+    {1440, 900},
+    {1366, 768},
+    {1360, 768},
+    {1280, 1024},
+    {1280, 800},
+    {1280, 768},
+    {1152, 864},
+    {1080, 1920},
+    {1024, 768}
+};
+// Получаем рандомное разрешение и устанавливаем
+int resolution = rndGenerator.Next(resolutionSet.Length/2);
+project.Profile.ScreenSizeWidth = resolutionSet[resolution, 0];
+project.Profile.ScreenSizeHeight = resolutionSet[resolution, 1];
+instance.SetWindowSize(project.Profile.ScreenSizeWidth, project.Profile.ScreenSizeHeight);
+
+// Видимая область
+project.Profile.AvailScreenWidth = project.Profile.ScreenSizeWidth-17;
+project.Profile.AvailScreenHeight = project.Profile.ScreenSizeHeight-40;
+// Глубина цвета монитора (Color Depth)
+// [Чуть позже будет обновление механизма установки этого параметра]
+instance.SetScreenPreference("screen_color_depth", 24);
+
+// Формируем набор возможных вариантов
+string cpu = Macros.TextProcessing.Spintax("{2|4|6|8}");
+ //if(((ZennoLab.InterfacesLibrary.ProjectModel.Collections.IContextExt)project.Context).IsInterrupted) return null;
+instance.ShowNavigatorField(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.HardwareConcurrency);
+// Устанавливаем рандомное кол-во ядер процессора
+instance.SetHeader(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.HardwareConcurrency, cpu);
+
+instance.SetBrowserPreference("dom.w3c_touch_events.enabled", 1); // Включаем сенсорные события
+instance.ShowNavigatorField(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.MaxTouchPoints);
+instance.SetHeader(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.MaxTouchPoints, "5"); // Устанавливаем 5 (например) максимальных одновременных касаний.
+
+//instance.ActiveTab.PageScale = rndGenerator.Next(90,150); // Устанавливаем Pixel Ratio в 150%
+
+instance.SetBrowserPreference("dom.storage.enabled", false);
+
+instance.SetBrowserPreference("dom.indexedDB.enabled", false);
+
+int ip = 192;
+int ip1 = 168;
+int ip2 = rndGenerator.Next(0,1);
+int ip3 = rndGenerator.Next(1,255);
+string proxys = ip.ToString()+"."+ip1.ToString()+"."+ip2.ToString()+"."+ip3.ToString(); // Укажите здесь желаемый адрес, который Вы хотите подсунуть WebRTC вместо реального (локального).
+instance.WebRTCWorkMode = ZennoLab.InterfacesLibrary.Enums.Browser.WebRTCMode.Emulate;
+instance.SetWebRTCAdresses(proxys);
+instance.ShowNavigatorField(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.DoNotTrack);
+instance.SetHeader(ZennoLab.InterfacesLibrary.Enums.Browser.NavigatorField.DoNotTrack, "1"); // Включает Do Not Track
+instance.SetBrowserPreference("webgl.disabled", true);
+//instance.SetBrowserPreference("webgl.enable-webgl2", false); // WebGL 2.0 не поддерживается текущей версией движка Mozilla Firefox, используемой в ZennoPoster 5.11.1.0
+instance.SetBrowserPreference("webgl.disable-extensions", true);
+instance.SetBrowserPreference("webgl.min_capability_mode", true);
+string strLink = string.Empty;
+
+if (tblMultiakk.RowCount==0) {
+	Global.SpecialForms.AlertNotificator.Instance.DisplayAlert("Неудача", "Нет акков в таблице multiakk.xlsx", null, 15000);
+	throw new Exception("Нет акков в таблице multiakk.xlsx");
+}
+lock (SyncObjects.TableSyncer) {
+	strLogin = tblMultiakk.GetCell(0,0);
+	strPass = tblMultiakk.GetCell(1,0);
+	strProxy = tblMultiakk.GetCell(2,0);
+	strUserAgent = tblMultiakk.GetCell(3,0);
+	strPhone = tblMultiakk.GetCell(4,0);
+	strLink = tblMultiakk.GetCell(5,0);
+	tblMultiakk.DeleteRow(0);
+}
+
+//Получаем данные профиля
+string strFilePath = project.Directory + @"\Avito\Cookie\" + strLogin + ".zpprofile";
+string strDirectoryPath = project.Directory + @"\Avito\Cookie\";
+//Directory.CreateDirectory: создаём новую папку
+Directory.CreateDirectory(strDirectoryPath);
+if (File.Exists(strFilePath)) {
+    project.Profile.Load(project.Directory + @"\Avito\Cookie\" + strLogin + ".zpprofile"); //загружаем профиль
+	Tab1.Navigate("https://www.avito.ru/profile");
+	Tab1.WaitDownloading();
+} else {
+	instance.SetProxy(strProxy, false, true, true);
+	project.Profile.UserAgent = string.Empty;
+	project.Profile.UserAgent = strUserAgent;
+	Tab1.Navigate("https://www.avito.ru/profile/");
+	Tab1.WaitDownloading();
+	Tab1.FindElementByXPath("//div[contains(@class, 'fieldset_grid')]/input[contains(@class, 'login')]",0).SetValue(strLogin,"Full");
+	Tab1.FindElementByXPath("//input[contains(@class, 'password-input')]",0).SetValue(strPass,"Full");
+	Tab1.FindElementByXPath("//button[contains(@class,'submit')]",0).Click();
+	Thread.Sleep(10000);
+	HtmlElement he1 = instance.ActiveTab.GetDocumentByAddress("0").FindElementById("errorTryAgain");
+	instance.WaitFieldEmulationDelay();
+	he1.RiseEvent("click", instance.EmulationLevel);
+	Tab1.WaitDownloading();
+}
+if (!Tab1.FindElementByXPath("//a[contains(@class,'profile-sidebar')]",0).IsVoid) {
+	project.SendInfoToLog("Успешно залогинились под аккаунтом " + strLogin,true);
+	lock (SyncObjects.TableSyncer) {
+		tblMultiakk.AddRow(new String[]{strLogin, strPass, strProxy, strUserAgent, strPhone, strLink});
+	}
+} else {
+	lock (SyncObjects.ListSyncer) {
+		lstBad.Add(strLogin+":"+strPass+"|"+instance.GetProxy()+"|"+strUserAgent);
+	}
+	project.SendErrorToLog("Не удалось залогиниться под аккаунтом",true);
+	return "oki";
+}
+string strLinkAutor = string.Empty;
+string strLinkAD = string.Empty;
+string strRegion = string.Empty;
+string strCity = string.Empty;
+string strTitleAd = string.Empty;
+string strTel = string.Empty;
+string strCaptchaService = project.Variables["captcha_service"].Value;
+string strTextMes = string.Empty;
+string strName = string.Empty;
+string strURL = string.Empty;
+
+for (int j=0; j<10000; j++) {
+	Tab1.Navigate("https://www.avito.ru/profile/messenger","https://www.avito.ru/");
+	Tab1.WaitDownloading();
+	Thread.Sleep(5000);
+	for (int w=0; w<10; w++) {
+		if (Tab1.FindElementsByXPath("//div[contains(@class, 'messenger-channel')]/div[contains(@class, 'messenger-channel-context')]").IsVoid) {
+			Tab1.Navigate(Tab1.URL);
+			Tab1.WaitDownloading();
+			Thread.Sleep(5000);
+			continue;
+		} else {
+			break;
+		}
+	}
+	if (!Tab1.FindElementByXPath("//label[contains(@class, 'unread')]/span[contains(@class, 'input-checkbox')]",0).IsVoid) {
+		Tab1.FindElementByXPath("//label[contains(@class, 'unread')]/span[contains(@class, 'input-checkbox')]",0).Click();
+	} else {
+		project.SendInfoToLog("Нет новых сообщений",true);
+		return "oki";
+	}
+	Thread.Sleep(5000);
+	HtmlElementCollection AllLinks3 = Tab1.FindElementsByXPath("//div[contains(@class, 'messenger-channel is-design-new')]/div[contains(@class, 'messenger-channel-context')]");
+	foreach(HtmlElement elLink3 in AllLinks3.Elements) {
+		if (elLink3.IsVoid) {
+			project.SendInfoToLog("Закончились непрочитанные входные сообщения",true);
+			return "oki";
+		}
+		elLink3.Click();
+		strURL = Tab1.URL;
+		Thread.Sleep(3000);
+		break;
+	}
+	strTextMes = Tab1.FindElementByXPath("//span[@class='messenger-message-text']/descendant::span",0).InnerText;
+	for (int u=0; u<10; u++) {
+		if (strTextMes==string.Empty) {
+			Thread.Sleep(5000);
+			Tab1.Navigate(strURL);
+			Tab1.WaitDownloading();
+			continue;
+		} else {
+			break;
+		}
+	}
+	strLinkAutor = Tab1.FindElementByXPath("//a[contains(@class,'messenger-messages-item-author-name')]",0).GetAttribute("href");
+	strLinkAD = Tab1.FindElementByXPath("//a[@class='messenger-messages-item-title-link']",0).GetAttribute("href");
+	Tab Tab2 = instance.NewTab("LinkAD");
+	instance.AllTabs[1].SetActive();
+	instance.ActiveTab.Navigate(strLinkAD);
+	if (Tab1.FindElementByXPath("//span[contains(@class,'fader')]",0).IsVoid) {
+		project.SendInfoToLog("Сброс пароля, завершаю работу",true);
+		return "oki";
+	}
+	instance.ActiveTab.WaitDownloading();
+	strName = instance.ActiveTab.FindElementByXPath("//div[contains(@class, 'seller-info-name')]/a",0).InnerText;
+	strTitleAd = instance.ActiveTab.FindElementByXPath("//span[contains(@class, 'title-info-title-text')]",0).InnerText;
+	instance.ActiveTab.FindElementByXPath("//button[contains(@class, 'button-origin-blue button-origin_full')]",0).Click();
+	strRegion = new Regex(@".*(?=,)").Match(instance.ActiveTab.FindElementByXPath("//div[contains(@class, 'seller-info-prop')]/div[contains(@class, 'value')]",0).InnerText).Value;
+	strCity = new Regex(@"(?<=,).*").Match(instance.ActiveTab.FindElementByXPath("//div[contains(@class, 'seller-info-prop')]/div[contains(@class, 'value')]",0).InnerText).Value;
+	for (int g=0; g<10; g++) {
+		if (!instance.ActiveTab.FindElementByXPath("//div[contains(@class, 'phone-big-number')]/img",0).IsVoid) {
+			Thread.Sleep(2000);
+			//Разгадываю капчу
+			for (i=0; i<5; i++) {
+				HtmlElement elCaptcha1 = instance.ActiveTab.FindElementByXPath("//div[contains(@class, 'number')]/img", 0);
+				string[] arrCaptchaResult1 = Regex.Split(ZennoPoster.CaptchaRecognition(strCaptchaService, elCaptcha1.DrawToBitmap(true), ""), Regex.Escape("-|-"));
+				if (arrCaptchaResult1[0]=="sorry") {
+					Thread.Sleep(rndGenerator.Next(5, 10)*1000);
+					continue;
+				}else{
+					project.SendInfoToLog("Получен номер: " + arrCaptchaResult1[0], true);
+					strTel = arrCaptchaResult1[0];
+					break;
+				}
+			}
+			break;
+		} else {
+			Thread.Sleep(3000);
+			continue;
+		}
+		project.SendInfoToLog("Номер телефона не появился",true);
+	}
+	Thread.Sleep(2000);
+	instance.ActiveTab.Close();
+	lock (SyncObjects.TableSyncer) {
+		tblResult.AddRow(new String[]{strName, strTel, strTitleAd, strRegion, strCity, strTextMes, strLinkAutor, strLinkAD,strLogin});
+	}
+	Tab1.FindElementByXPath("//button[contains(@class,'button-root_design-text-link')]",0).Click();
+	Thread.Sleep(2000);
+}
